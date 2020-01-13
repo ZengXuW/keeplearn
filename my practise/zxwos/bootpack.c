@@ -3,21 +3,26 @@
 * @Author: zxw
 * @Date:   2020-01-10 19:21:10
 * @Last Modified by:   zxw
-* @Last Modified time: 2020-01-13 16:57:28
+* @Last Modified time: 2020-01-13 19:15:54
 */
 #include "bootpack.h"					 
 #include <stdio.h>
 
+struct MOUSE_DEC {
+	unsigned char buf[3], phase;
+};
+
 extern struct FIFO8 keyfifo, mousefifo;  /*设立缓冲区*/
-void enable_mouse(void);
+void enable_mouse(struct MOUSE_DEC *mdec);
 void init_keyboard(void);
+int mouse_decode(struct MOUSE_DEC *mdec, unsigned char data);
 
 void HariMain(void)
 {
 	struct  BOOTINFO *binfo = (struct BOOTINFO *) ADR_BOOTINFO;
 	char s[40], mcursor[256], keybuf[32], mousebuf[128];
 	int mx, my, i;
-	unsigned char mouse_dbuf[3], mouse_phase;
+	struct MOUSE_DEC mdec;
 	
 	/* 
 		关于CPU中断的补充知识：
@@ -46,8 +51,7 @@ void HariMain(void)
 	putfonts8_asc(binfo->vram, binfo->scrnx, 0, 0, COL8_FFFFFF, s);
 	putfonts8_asc(binfo->vram, binfo->scrnx, 31, 50, COL8_FFFFFF, "ZXW FIRST OS.");
 	
-	enable_mouse();
-	mouse_phase = 0; /*进入到等待鼠标的0xfa状态*/
+	enable_mouse(&mdec);
 
 	for (;;) {
 		io_cli(); // 首先屏蔽中断
@@ -64,27 +68,11 @@ void HariMain(void)
 			} else if (fifo8_status(&mousefifo) != 0) {
 				i = fifo8_get(&mousefifo);
 				io_sti();
-				if (mouse_phase == 0) {
-					/*等待鼠标的0xfa的状态*/
-					if (i == 0xfa) {
-						mouse_phase = 1;
-					}
-				} else if (mouse_phase == 1) {
-					/*等待鼠标的第一字节*/
-					mouse_dbuf[0] = i;
-					mouse_phase = 2;
-				} else if (mouse_phase == 2) {
-					/*等待鼠标的第二字节*/
-					mouse_dbuf[1] = i;
-					mouse_phase = 3;
-				} else if (mouse_phase == 3) {
-					/*等待鼠标的第三字节*/
-					mouse_dbuf[2] = i;
-					mouse_phase = 1;
-					/*获得鼠标的三个字节完成，将其显示出来*/
-					sprintf(s, "%02X %02X %02X", mouse_dbuf[0], mouse_dbuf[1], mouse_dbuf[2]);
-					boxfill8(binfo->vram, binfo->scrnx, COL8_008484, 32, 16, 32 + 8 * 8 - 1, 31);
-					putfonts8_asc(binfo->vram, binfo->scrnx, 32, 16, COL8_FFFFFF, s);
+				if (mouse_decode(&mdec, i) != 0) {
+					/*3字节凑齐了，把字节显示出来*/
+					sprintf(s,"%02X %02X %02X", mdec.buf[0], mdec.buf[1], mdec.buf[2]);
+					boxfill8(binfo->vram, binfo->scrnx, COL8_008484, 32, 16, 32 + 8 * 8 -1, 31);
+					putfonts8_asc(binfo->vram, binfo->scrnx, 32 , 16, COL8_FFFFFF, s);
 				}
 			}
 		}
@@ -120,10 +108,43 @@ void init_keyboard(void) {
 #define KEYCMD_SEND_MOUSE		0xd4
 #define MOUSECMD_ENABLE			0xf4
 
-void enable_mouse(void) {
+void enable_mouse(struct MOUSE_DEC *mdec) {
+	/*鼠标有效*/
 	wait_KBC_sendready();
 	io_out8(PORT_KEYCMD, KEYCMD_SEND_MOUSE);
 	wait_KBC_sendready();
 	io_out8(PORT_KEYDAT, MOUSECMD_ENABLE);
-	return; /*顺利的话，键盘控制会返回ACK(0xfa)*/
+	/*顺利的话，键盘控制会返回ACK(0xfa)*/
+	mdec->phase = 0; /*等待鼠标的0xfa*/
+	return; 
+}
+
+int mouse_decode(struct MOUSE_DEC *mdec, unsigned char dat)
+{
+	if (mdec->phase == 0) {
+		/*等待鼠标的0xfa的阶段*/
+		if (dat == 0xfa) {
+			mdec->phase = 1;
+		}
+		return 0;
+	}
+	if (mdec->phase == 1) {
+		/*等待第一个字节*/
+		mdec->buf[0] = dat;
+		mdec->phase = 2;
+		return 0;
+	}
+	if (mdec->phase == 2) {
+		/*等待第二个字节*/
+		mdec->buf[1] = dat;
+		mdec->phase = 3;
+		return 0;
+	}
+	if (mdec->phase == 3) {
+		mdec->buf[2] = dat;
+		mdec->phase = 1;
+		return 1;
+	}
+
+	return -1; /*如果出现鼠标异常*/
 }
