@@ -3,7 +3,7 @@
 * @Author: zxw
 * @Date:   2020-01-10 19:21:10
 * @Last Modified by:   zxw
-* @Last Modified time: 2020-01-13 19:52:25
+* @Last Modified time: 2020-01-13 23:43:18
 */
 #include "bootpack.h"					 
 #include <stdio.h>
@@ -48,7 +48,7 @@ void HariMain(void)
 	my = (binfo->scrny - 28 - 16) / 2;
 	init_mouse_cursor8(mcursor, COL8_008484);
 	putblock8_8(binfo->vram, binfo->scrnx, 16, 16, mx, my, mcursor, 16);
-	sprintf(s, "(%d, %d)", mx, my);
+	sprintf(s, "(%3d, %3d)", mx, my);
 	putfonts8_asc(binfo->vram, binfo->scrnx, 0, 0, COL8_FFFFFF, s);
 	putfonts8_asc(binfo->vram, binfo->scrnx, 31, 50, COL8_FFFFFF, "ZXW FIRST OS.");
 	
@@ -56,7 +56,7 @@ void HariMain(void)
 
 	for (;;) {
 		io_cli(); // 首先屏蔽中断
-		if(fifo8_status(&keyfifo) + + fifo8_status(&mousefifo) == 0) {
+		if(fifo8_status(&keyfifo) + fifo8_status(&mousefifo) == 0) {
 			io_stihlt(); // io_stihlt(): 执行STL指令，然后让CPU执行HLT
 		} else {
 			if (fifo8_status(&keyfifo) != 0)
@@ -83,6 +83,28 @@ void HariMain(void)
 					}
 					boxfill8(binfo->vram, binfo->scrnx, COL8_008484, 32, 16, 32 + 15 * 8 - 1, 31);
 					putfonts8_asc(binfo->vram, binfo->scrnx, 32, 16, COL8_FFFFFF, s);
+					/*鼠标指针的移动*/
+					boxfill8(binfo->vram, binfo->scrnx, COL8_008484, mx, my, mx + 15, my + 15);/*隐藏鼠标*/
+					mx += mdec.x;
+					my += mdec.y;
+					if (mx < 0) {
+						mx = 0;
+					}
+					if (my < 0) {
+						my = 0;
+					}
+					if (mx > binfo->scrnx - 16) {
+						/*如果超出屏幕边界*/
+						mx = binfo->scrnx - 16;
+					}
+					if (my > binfo->scrny - 16) {
+						my = binfo->scrny - 16;
+					}
+					sprintf(s, "(%3d, %3d)", mx, my);
+					boxfill8(binfo->vram, binfo->scrnx, COL8_008484, 0, 0, 79, 15); /*隐藏坐标*/
+					putfonts8_asc(binfo->vram, binfo->scrnx, 0, 0, COL8_FFFFFF, s); /*显示坐标*/
+					putblock8_8(binfo->vram, binfo->scrnx, 16, 16, mx, my, mcursor, 16); /*显示鼠标*/
+
 				}
 			}
 		}
@@ -164,7 +186,7 @@ int mouse_decode(struct MOUSE_DEC *mdec, unsigned char dat)
 		if ((mdec->buf[0] & 0x10) != 0) {
 			mdec->x |= 0xffffff00;
 		}
-		if ((mdec->buf[0]) & 0x20 != 0) {
+		if ((mdec->buf[0] & 0x20) != 0) {
 			mdec->y |= 0xffffff00;
 		}
 		mdec->y = - mdec->y; /*鼠标的y方向与画面符号相反*/
