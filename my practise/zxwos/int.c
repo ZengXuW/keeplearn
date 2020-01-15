@@ -54,34 +54,6 @@ void init_pic(void)
 	
 	return;
 }
-
-#define PORT_KEYDAT		0x0060
-
-struct FIFO8 keyfifo;
-
-void inthandler21(int *esp)
-/* 来自PS/2键盘的中断 */
-{
-	unsigned char data;
-	io_out8(PIC0_OCW2, 0x61); 	/*通知PIC0，说IRQ-01的受理已经完成*/
-	data = io_in8(PORT_KEYDAT);
-	fifo8_put(&keyfifo, data);
-	return;
-}
-
-struct FIFO8 mousefifo;
-
-void inthandler2c(int *esp)
-/* 来自PS / 2鼠标中断 */
-{
-	unsigned char data;
-	io_out8(PIC1_OCW2, 0x64);		/*通知PIC1， IRQ-12的受理已经完成*/
-	io_out8(PIC0_OCW2, 0x62);		/*通知PIC0， IRQ-02的受理已经完成*/
-	data = io_in8(PORT_KEYDAT);
-	fifo8_put(&mousefifo, data);
-	return;
-}
-
 /* 
 	对于一部分机种而言，随着PIC的初始化，会产生IRQ7中断，
 	如果不针对该中断处理程序执行STI(设置中断标志位),操作系统的启动就会失败 
