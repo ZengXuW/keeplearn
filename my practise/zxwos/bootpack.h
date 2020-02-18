@@ -147,3 +147,42 @@ unsigned int memman_alloc(struct MEMMAN *man, unsigned int size);
 int memman_free(struct MEMMAN *man, unsigned int addr, unsigned int size);
 unsigned int memman_alloc_4k(struct MEMMAN *man, unsigned int size);
 int mememan_free_4k(struct MENMAN *man, unsigned int addr, unsigned int size);
+
+/* sheet.c */
+#define MAX_SHEETS		256		/* 最大图层数量 */
+/*
+	图层的整体大小 bxsize * bysize
+	vx0, vy0是图层在桌面的坐标位置， v是VRAM的简写
+	col_inv表示透明色色号，它是color和invisible的组合缩写
+	height表示图层高度
+	Flags用于存放有关图层的各种设定信息
+*/
+struct SHEET {
+	unsigned char *buf;
+	int bxsize, bysize, vx0, vy0, col_inv, height, flags;
+};
+/*
+	SHTCTL是 SHEET和CONTROL的简写
+	vram, xsize, ysize代表VRAM的地址和画面的大小，
+	但如果每次都从BOOTINFO中查询就太麻烦了，所以在
+	这里我们预先对他们进行赋值操作
+	top代表最上面图层的高度。
+	sheets0是用来存放我们准备的256个图层的信息
+	而sheets是记忆地址变量的领域，所以要相应的准备256个
+	我们把sheets0中的图层按照高度进行升序排列，然后将其
+	地址写入sheets中，这样方便读取。
+*/
+struct SHTCTL {		
+	unsigned char *vram;
+	int xsize, ysize, top;
+	struct SHEET *sheets[MAX_SHEETS];
+	struct SHEET sheets0[MAX_SHEETS];
+};
+struct SHTCTL *shtctl_init(struct MEMMAN *memman, unsigned char *vram, int xsize, int ysize);
+struct SHEET *sheet_alloc(struct SHTCTL *ctl);
+void sheet_setbuf(struct SHEET *sht, unsigned char *buf, int xsize, int ysize, int col_inv);
+void sheet_updown(struct SHTCTL *ctl, struct SHEET *sht, int height);
+void sheet_refresh(struct SHTCTL *ctl);
+void sheet_slide(struct SHTCTL *ctl, struct SHEET *sht, int vx0, int vy0);
+void sheet_free(struct SHTCTL *ctl, struct SHEET *sht);
+ 
