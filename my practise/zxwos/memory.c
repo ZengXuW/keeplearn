@@ -3,7 +3,7 @@
 * @Author: zxw
 * @Date:   2020-01-26 12:20:22
 * @Last Modified by:   zxw
-* @Last Modified time: 2020-01-26 12:35:12
+* @Last Modified time: 2020-02-18 17:21:27
 */
 
 #include "bootpack.h"
@@ -155,7 +155,7 @@ int memman_free(struct MEMMAN *man, unsigned int addr, unsigned int size)
 }
 
 /* 以4K大小分配内存 */
-unsigned int mememan_alloc_4k(struct MENMAN *man, unsigned int size)
+unsigned int memman_alloc_4k(struct MEMMAN *man, unsigned int size)
 {
 	unsigned int a;
 	size = (size + 0xfff) & 0xfffff000;
